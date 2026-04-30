@@ -1,8 +1,10 @@
 "use client";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { toJpeg, toPng } from "html-to-image";
+import { jsPDF } from "jspdf";
 import TaskItem from "./components/TaskItem";
 
-const FILTERS = ["all", "completed", "pending"];
+const FILTERS = ["all", "pending", "completed"];
 const THEME_OPTIONS = ["light", "dark", "system"];
 const TASKS_STORAGE_KEY = "tasks";
 const TASKS_EVENT = "tasks-updated";
@@ -11,6 +13,34 @@ const THEME_EVENT = "theme-updated";
 const EMPTY_TASKS = [];
 let cachedTasksRaw = null;
 let cachedTasksSnapshot = EMPTY_TASKS;
+
+function normalizeTask(task) {
+  return {
+    ...task,
+    id: typeof task?.id === "number" || typeof task?.id === "string"
+      ? task.id
+      : `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    text: typeof task?.text === "string" ? task.text : "",
+    completed: Boolean(task?.completed),
+    dueDate: typeof task?.dueDate === "string" ? task.dueDate : "",
+    category: typeof task?.category === "string" ? task.category : "",
+    order: Number.isFinite(task?.order) ? task.order : 0,
+    tags: Array.isArray(task?.tags)
+      ? task.tags.filter((tag) => typeof tag === "string" && tag.trim()).map((tag) => tag.trim())
+      : []
+  };
+}
+
+function parseTags(value) {
+  return Array.from(
+    new Set(
+      value
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean)
+    )
+  );
+}
 
 function formatDisplayDate(value) {
   if (!value) return "";
@@ -49,7 +79,9 @@ function getStoredTasks() {
     }
 
     const savedTasks = JSON.parse(rawTasks);
-    cachedTasksSnapshot = Array.isArray(savedTasks) ? savedTasks : EMPTY_TASKS;
+    cachedTasksSnapshot = Array.isArray(savedTasks)
+      ? savedTasks.map(normalizeTask)
+      : EMPTY_TASKS;
     return cachedTasksSnapshot;
   } catch (err) {
     console.error("Failed to load tasks", err);
@@ -103,7 +135,14 @@ function getSystemTheme() {
 function getStoredThemePreference() {
   if (typeof window === "undefined") return "system";
 
-  return localStorage.getItem(THEME_STORAGE_KEY) || "system";
+  const savedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+
+  if (!savedTheme) {
+    localStorage.setItem(THEME_STORAGE_KEY, "system");
+    return "system";
+  }
+
+  return savedTheme;
 }
 
 function getServerThemePreference() {
@@ -162,10 +201,15 @@ function subscribeToSystemTheme(callback) {
 
 export default function Home() {
   const [input, setInput] = useState("");
+  const [category, setCategory] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const [dueDate, setDueDate] = useState("");
   const [dateActivated, setDateActivated] = useState(false);
   const [filter, setFilter] = useState("all");
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+  const [backupMessage, setBackupMessage] = useState("");
+  const taskBoardRef = useRef(null);
   const tasks = useSyncExternalStore(
     subscribeToTasks,
     getStoredTasks,
@@ -203,11 +247,15 @@ export default function Home() {
       id: Date.now(),
       text: input.trim(),
       completed: false,
-      dueDate: dueDate || ""
+      dueDate: dueDate || "",
+      category: category.trim(),
+      tags: parseTags(tagsInput)
     };
 
     persistTasks((prev) => [...prev, newTask]);
     setInput("");
+    setCategory("");
+    setTagsInput("");
     setDueDate("");
     setDateActivated(false);
   };
@@ -269,16 +317,103 @@ export default function Home() {
     return due < today;
   };
 
+  const downloadDataUrl = (dataUrl, extension) => {
+    const link = document.createElement("a");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+
+    link.href = dataUrl;
+    link.download = `todo-list-task-board-${dateStamp}.${extension}`;
+    link.click();
+  };
+
+  const exportTaskBoard = async (format) => {
+    const node = taskBoardRef.current;
+
+    if (!node) return;
+
+    try {
+      setBackupMessage("Preparing task board backup...");
+
+      const exportOptions = {
+        cacheBust: true,
+        pixelRatio: 2,
+        backgroundColor: resolvedTheme === "dark" ? "#111827" : "#fffaf2"
+      };
+
+      if (format === "png") {
+        const dataUrl = await toPng(node, exportOptions);
+        downloadDataUrl(dataUrl, "png");
+        setBackupMessage("Task board exported as PNG.");
+        return;
+      }
+
+      if (format === "jpg") {
+        const dataUrl = await toJpeg(node, {
+          ...exportOptions,
+          quality: 0.95
+        });
+        downloadDataUrl(dataUrl, "jpg");
+        setBackupMessage("Task board exported as JPG.");
+        return;
+      }
+
+      if (format === "pdf") {
+        const dataUrl = await toPng(node, exportOptions);
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "px",
+          format: "a4"
+        });
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const img = new Image();
+
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          img.src = dataUrl;
+        });
+
+        const scale = Math.min(pageWidth / img.width, pageHeight / img.height);
+        const renderWidth = img.width * scale;
+        const renderHeight = img.height * scale;
+        const x = (pageWidth - renderWidth) / 2;
+        const y = 20;
+
+        pdf.addImage(dataUrl, "PNG", x, y, renderWidth, renderHeight);
+        pdf.save(`todo-list-task-board-${new Date().toISOString().slice(0, 10)}.pdf`);
+        setBackupMessage("Task board exported as PDF.");
+      }
+    } catch (error) {
+      console.error("Failed to export task board", error);
+      setBackupMessage("Task board export failed. Please try again.");
+    }
+  };
+
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
   const filteredTasks = tasks
     .filter((task) => {
       if (filter === "completed") return task.completed;
       if (filter === "pending") return !task.completed;
       return true;
     })
+    .filter((task) => {
+      if (!normalizedSearchQuery) return true;
+
+      const searchableText = [
+        task.text,
+        task.category,
+        ...(Array.isArray(task.tags) ? task.tags : [])
+      ]
+        .join(" ")
+        .toLowerCase();
+
+      return searchableText.includes(normalizedSearchQuery);
+    })
     .sort((a, b) => {
       const diff = getPriority(a) - getPriority(b);
       if (diff !== 0) return diff;
-      return b.id - a.id;
+      return Number(b.id) - Number(a.id);
     });
 
   const completedCount = tasks.filter((task) => task.completed).length;
@@ -288,6 +423,7 @@ export default function Home() {
   const isInputEmpty = !input.trim();
   const hasCompletedTasks = completedCount > 0;
   const resolvedTheme = themePreference === "system" ? systemTheme : themePreference;
+  const hasActiveSearch = normalizedSearchQuery.length > 0;
   const themeSummary = themePreference === "system"
     ? `System (${resolvedTheme})`
     : themePreference[0].toUpperCase() + themePreference.slice(1);
@@ -309,8 +445,8 @@ export default function Home() {
         <div className="theme-orb-bottom absolute bottom-[-7rem] left-1/2 h-72 w-72 -translate-x-1/2 rounded-full blur-3xl animate-[pulseGlow_10s_ease-in-out_infinite]" />
       </div>
 
-      <div className="relative mx-auto flex w-full max-w-6xl flex-col gap-4 lg:flex-row lg:gap-6">
-        <section className="glass-panel animate-[slideUp_0.6s_ease-out] overflow-hidden rounded-[2rem] p-4 sm:p-6 lg:w-[24rem] lg:p-7">
+      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-4 lg:flex-row lg:gap-6">
+        <section className="glass-panel animate-[slideUp_0.6s_ease-out] overflow-hidden rounded-[2rem] p-4 sm:p-6 lg:w-[30rem] lg:p-7 xl:w-[32rem]">
           <div>
             <div className="flex items-start justify-between gap-3">
               <span className="theme-chip inline-flex items-center rounded-full border px-3 py-1 text-[11px] uppercase tracking-[0.28em] font-lexend">
@@ -415,7 +551,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+          <div className="mt-6 grid grid-cols-3 gap-3">
             <article className="stat-card stat-card-compact animate-[slideUp_0.75s_ease-out]">
               <span className="stat-label">Total</span>
               <strong className="stat-value">{tasks.length}</strong>
@@ -430,10 +566,7 @@ export default function Home() {
             </article>
           </div>
 
-        </section>
-
-        <section className="glass-panel animate-[slideUp_0.72s_ease-out] min-w-0 flex-1 rounded-[2rem] p-3 sm:p-5 lg:p-7">
-          <div className="theme-card rounded-[1.7rem] border p-4 sm:p-5">
+          <div className="theme-card mt-6 rounded-[1.7rem] border p-4 sm:p-5">
             <div className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <div>
@@ -446,11 +579,11 @@ export default function Home() {
                 </div>
 
                 <p className="theme-copy text-sm leading-6 font-alef">
-                  Tasks with due dates rise to the top, overdue work stays visible, and all dates use the same clean numeric rhythm.
+                  Add a task fast, keep the extra context optional, and let the board surface what needs attention first.
                 </p>
               </div>
 
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[1.4fr_0.95fr_auto]">
+              <div className="grid gap-3">
                 <label className="flex flex-col gap-2">
                   <span className="theme-copy-muted text-xs uppercase tracking-[0.22em] font-lexend">
                     Task
@@ -466,78 +599,197 @@ export default function Home() {
                   />
                 </label>
 
-                <label className="flex flex-col gap-2">
-                  <span className="theme-copy-muted text-xs uppercase tracking-[0.22em] font-lexend">
-                    Due Date (Optional)
-                  </span>
-                  <input
-                    type={dateActivated || dueDate ? "date" : "text"}
-                    inputMode="numeric"
-                    className={`input-shell font-lexend tabular-nums ${dueDate ? "theme-heading" : "text-stone-400 dark:text-slate-400"}`}
-                    value={dueDate}
-                    placeholder="dd/mm/yyyy"
-                    onFocus={activateDateField}
-                    onClick={activateDateField}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !isInputEmpty) addTask();
-                    }}
-                  />
-                </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex flex-col gap-2">
+                    <span className="theme-copy-muted block min-h-10 text-xs uppercase tracking-[0.22em] font-lexend">
+                      Category
+                      <br />
+                      (Optional)
+                    </span>
+                    <input
+                      className="input-shell font-lexend"
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="Work, Personal"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !isInputEmpty) addTask();
+                      }}
+                    />
+                  </label>
 
-                <button
-                  onClick={addTask}
-                  disabled={isInputEmpty}
-                  className={`btn-base btn-lg btn-pill md:col-span-2 xl:col-span-1 xl:mt-auto ${
-                    isInputEmpty
-                      ? "btn-muted"
-                      : "theme-cta"
-                  }`}
-                >
-                  Add Task
-                </button>
-              </div>
-
-              <div className="theme-divider flex flex-col gap-4 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex flex-wrap gap-2">
-                  {FILTERS.map((item) => (
-                    <button
-                      key={item}
-                      onClick={() => setFilter(item)}
-                      className={`btn-base btn-sm capitalize ${
-                        filter === item
-                          ? "theme-toggle-active"
-                          : "theme-filter"
-                      }`}
-                    >
-                      {item}
-                    </button>
-                  ))}
+                  <label className="flex flex-col gap-2">
+                    <span className="theme-copy-muted block min-h-10 text-xs uppercase tracking-[0.22em] font-lexend">
+                      Tags
+                      <br />
+                      (Optional)
+                    </span>
+                    <input
+                      className="input-shell font-lexend"
+                      value={tagsInput}
+                      onChange={(e) => setTagsInput(e.target.value)}
+                      placeholder="urgent, design"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !isInputEmpty) addTask();
+                      }}
+                    />
+                  </label>
                 </div>
 
-                <button
-                  onClick={clearCompleted}
-                  disabled={!hasCompletedTasks}
-                  className={`btn-base btn-sm ${
-                    hasCompletedTasks
-                      ? "btn-danger"
-                      : "btn-muted"
-                  }`}
-                >
-                  Clear Completed
-                </button>
+                <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                  <label className="flex flex-col gap-2">
+                    <span className="theme-copy-muted block min-h-10 text-xs uppercase tracking-[0.22em] font-lexend">
+                      Due Date
+                      <br />
+                      (Optional)
+                    </span>
+                    <input
+                      type={dateActivated || dueDate ? "date" : "text"}
+                      inputMode="numeric"
+                      className={`input-shell font-lexend tabular-nums ${dueDate ? "theme-heading" : "text-stone-400 dark:text-slate-400"}`}
+                      value={dueDate}
+                      placeholder="dd/mm/yyyy"
+                      onFocus={activateDateField}
+                      onClick={activateDateField}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && !isInputEmpty) addTask();
+                      }}
+                    />
+                  </label>
+
+                  <button
+                    onClick={addTask}
+                    disabled={isInputEmpty}
+                    className={`btn-base btn-lg btn-pill sm:min-w-40 ${
+                      isInputEmpty
+                        ? "btn-muted"
+                        : "theme-cta"
+                    }`}
+                  >
+                    Add Task
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="glass-panel animate-[slideUp_0.72s_ease-out] min-w-0 flex-1 rounded-[2rem] p-3 sm:p-5 lg:p-7">
+          <div className="theme-card rounded-[1.7rem] border p-4 sm:p-5">
+            <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-4">
+                <div className="grid gap-3">
+                  <label className="flex flex-col gap-2">
+                    <span className="theme-copy-muted text-xs uppercase tracking-[0.22em] font-lexend">
+                      Search
+                    </span>
+                    <input
+                      className="input-shell font-lexend"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Search tasks, categories, or tags"
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <span className="theme-copy-muted text-xs uppercase tracking-[0.22em] font-lexend">
+                      Filter
+                    </span>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex flex-wrap gap-2">
+                        {FILTERS.map((item) => (
+                          <button
+                            key={item}
+                            onClick={() => setFilter(item)}
+                            className={`btn-base btn-sm capitalize ${
+                              filter === item
+                                ? "theme-toggle-active"
+                                : "theme-filter"
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={clearCompleted}
+                        disabled={!hasCompletedTasks}
+                        className={`btn-base btn-sm self-start sm:self-auto ${
+                          hasCompletedTasks
+                            ? "btn-danger"
+                            : "btn-muted"
+                        }`}
+                      >
+                        Clear Completed
+                      </button>
+                    </div>
+                  </div>
+
+                  {hasActiveSearch && (
+                    <button
+                      onClick={() => {
+                        setSearchQuery("");
+                      }}
+                      className="btn-base btn-sm theme-filter self-start"
+                    >
+                      Clear Search
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="theme-task-board mt-5 rounded-[1.7rem] border p-4 sm:p-5">
-            <div>
-              <p className="theme-copy-muted text-xs uppercase tracking-[0.24em] font-lexend">
-                Task Board
-              </p>
-              <h3 className="theme-heading mt-1 text-2xl font-space font-bold">
-                Sorted by urgency
-              </h3>
+          <div
+            ref={taskBoardRef}
+            className="theme-task-board mt-5 rounded-[1.7rem] border p-4 sm:p-5"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="theme-copy-muted text-xs uppercase tracking-[0.24em] font-lexend">
+                  Task Board
+                </p>
+                <h3 className="theme-heading mt-1 text-2xl font-space font-bold">
+                  Sorted by urgency
+                </h3>
+              </div>
+
+              <div className="flex flex-col items-start gap-2 sm:items-end">
+                <span className="theme-copy-muted text-xs uppercase tracking-[0.22em] font-lexend">
+                  Backup
+                </span>
+                <div className="flex flex-wrap gap-2 sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => exportTaskBoard("png")}
+                    className="btn-base btn-sm theme-filter"
+                  >
+                    PNG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportTaskBoard("jpg")}
+                    className="btn-base btn-sm theme-filter"
+                  >
+                    JPG
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => exportTaskBoard("pdf")}
+                    className="btn-base btn-sm theme-filter"
+                  >
+                    PDF
+                  </button>
+                </div>
+                {backupMessage && (
+                  <p className="theme-copy text-right text-sm leading-6 font-alef">
+                    {backupMessage}
+                  </p>
+                )}
+              </div>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -555,12 +807,18 @@ export default function Home() {
               {filteredTasks.length === 0 && (
                 <div className="theme-empty rounded-[1.5rem] border px-5 py-10 text-center">
                   <p className="theme-heading text-xl font-space">
-                    {tasks.length === 0 ? "No tasks yet" : `No ${filter} tasks`}
+                    {tasks.length === 0
+                      ? "No tasks yet"
+                      : hasActiveSearch
+                        ? "No matching tasks"
+                        : `No ${filter} tasks`}
                   </p>
                   <p className="theme-copy mt-2 text-sm leading-6 font-alef">
                     {tasks.length === 0
                       ? "Add your first task, give it a due date if you want, and let the board take care of the ordering."
-                      : `Switch filters or add a new task to fill this ${filter} lane.`}
+                      : hasActiveSearch
+                        ? "Try another search term or add a task that fits this view."
+                        : `Switch filters or add a new task to fill this ${filter} lane.`}
                   </p>
                 </div>
               )}

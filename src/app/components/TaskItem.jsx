@@ -17,8 +17,20 @@ export default function TaskItem({
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editText, setEditText] = useState(task.text);
+  const [editCategory, setEditCategory] = useState(task.category || "");
+  const [editTags, setEditTags] = useState(Array.isArray(task.tags) ? task.tags.join(", ") : "");
   const [editDate, setEditDate] = useState(task.dueDate || "");
   const [editDateActivated, setEditDateActivated] = useState(Boolean(task.dueDate));
+
+  const parseTags = (value) =>
+    Array.from(
+      new Set(
+        value
+          .split(",")
+          .map((tag) => tag.trim())
+          .filter(Boolean)
+      )
+    );
 
   const activateEditDate = () => {
     setEditDateActivated(true);
@@ -33,7 +45,9 @@ export default function TaskItem({
 
     updateTask(task.id, {
       text: editText.trim(),
-      dueDate: editDate || ""
+      dueDate: editDate || "",
+      category: editCategory.trim(),
+      tags: parseTags(editTags)
     });
 
     setIsEditing(false);
@@ -41,6 +55,8 @@ export default function TaskItem({
 
   const handleCancel = () => {
     setEditText(task.text);
+    setEditCategory(task.category || "");
+    setEditTags(Array.isArray(task.tags) ? task.tags.join(", ") : "");
     setEditDate(task.dueDate || "");
     setEditDateActivated(Boolean(task.dueDate));
     setIsEditing(false);
@@ -63,7 +79,6 @@ export default function TaskItem({
     : isOverdue()
       ? "border-rose-200 bg-transparent dark:border-rose-900/60 dark:bg-transparent"
       : "border-stone-300 bg-transparent hover:-translate-y-0.5 hover:border-stone-500 hover:shadow-[0_20px_36px_rgba(28,25,23,0.12)] dark:border-slate-700 dark:bg-transparent dark:hover:border-slate-500 dark:hover:shadow-[0_20px_36px_rgba(0,0,0,0.24)]";
-
   return (
     <article
       className={`task-item-card theme-card animate-[fadeIn_0.24s_ease-in] rounded-[1.45rem] border p-4 transition-all duration-300 ${cardClasses}`}
@@ -99,6 +114,18 @@ export default function TaskItem({
                 onChange={(e) => setEditText(e.target.value)}
               />
               <input
+                className="input-shell min-h-11 font-lexend"
+                value={editCategory}
+                onChange={(e) => setEditCategory(e.target.value)}
+                placeholder="Category (optional)"
+              />
+              <input
+                className="input-shell min-h-11 font-lexend"
+                value={editTags}
+                onChange={(e) => setEditTags(e.target.value)}
+                placeholder="Tags separated by commas (optional)"
+              />
+              <input
                 type={editDateActivated || editDate ? "date" : "text"}
                 inputMode="numeric"
                 className={`input-shell min-h-11 font-lexend tabular-nums ${editDate ? "theme-heading" : "text-stone-400 dark:text-slate-400"}`}
@@ -128,6 +155,21 @@ export default function TaskItem({
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-2">
+                {task.category && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs text-amber-900 font-lexend dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-100">
+                    {task.category}
+                  </span>
+                )}
+
+                {Array.isArray(task.tags) && task.tags.map((tag) => (
+                  <span
+                    key={`${task.id}-${tag}`}
+                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs text-emerald-900 font-lexend dark:border-emerald-900/70 dark:bg-emerald-950/50 dark:text-emerald-100"
+                  >
+                    #{tag}
+                  </span>
+                ))}
+
                 {task.dueDate ? (
                   <span
                     className={`rounded-full px-3 py-1 text-xs tabular-nums font-lexend font-semibold ${
