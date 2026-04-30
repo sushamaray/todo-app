@@ -1,15 +1,15 @@
 import { ImageResponse } from "next/og";
 
 function IconMarkup({ size, maskable = false }) {
-  const safeInset = maskable ? Math.round(size * 0.18) : Math.round(size * 0.12);
-  const cardWidth = size - safeInset * 2;
-  const cardHeight = Math.round(cardWidth * 1.06);
-  const paperInsetX = Math.round(cardWidth * 0.16);
-  const paperInsetTop = Math.round(cardHeight * 0.14);
-  const rowGap = Math.round(cardHeight * 0.16);
-  const dotSize = Math.max(12, Math.round(cardWidth * 0.06));
-  const lineWidth = Math.round(cardWidth * 0.43);
-  const lineHeight = Math.max(8, Math.round(cardHeight * 0.035));
+  const safeInset = maskable ? Math.round(size * 0.16) : Math.round(size * 0.12);
+  const frameSize = size - safeInset * 2;
+  const frameRadius = Math.round(frameSize * 0.24);
+  const symbolSize = Math.round(frameSize * 0.58);
+  const symbolRadius = Math.round(symbolSize * 0.26);
+  const checkWidth = Math.round(symbolSize * 0.34);
+  const checkHeight = Math.round(symbolSize * 0.22);
+  const lineWidth = Math.round(frameSize * 0.16);
+  const lineHeight = Math.max(10, Math.round(frameSize * 0.03));
 
   return (
     <div
@@ -20,7 +20,7 @@ function IconMarkup({ size, maskable = false }) {
         alignItems: "center",
         justifyContent: "center",
         background:
-          "radial-gradient(circle at 22% 18%, rgba(251, 191, 36, 0.34), transparent 32%), linear-gradient(145deg, #111827 0%, #1f2937 48%, #0f172a 100%)",
+          "linear-gradient(145deg, #0f172a 0%, #162033 55%, #1e293b 100%)",
         position: "relative",
         overflow: "hidden"
       }}
@@ -28,35 +28,35 @@ function IconMarkup({ size, maskable = false }) {
       <div
         style={{
           position: "absolute",
-          inset: Math.round(size * 0.08),
-          borderRadius: Math.round(size * 0.24),
-          border: `${Math.max(2, Math.round(size * 0.01))}px solid rgba(255, 255, 255, 0.08)`,
-          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.08)"
+          inset: Math.round(size * 0.07),
+          borderRadius: Math.round(size * 0.26),
+          border: `${Math.max(2, Math.round(size * 0.009))}px solid rgba(255, 255, 255, 0.1)`,
+          boxShadow: "inset 0 1px 0 rgba(255,255,255,0.06)"
         }}
       />
 
       <div
         style={{
           position: "absolute",
-          top: Math.round(size * 0.12),
-          left: Math.round(size * 0.16),
-          width: Math.round(size * 0.26),
-          height: Math.round(size * 0.26),
+          top: Math.round(size * 0.14),
+          left: Math.round(size * 0.14),
+          width: Math.round(size * 0.24),
+          height: Math.round(size * 0.24),
           borderRadius: "999px",
-          background: "rgba(251, 113, 133, 0.18)",
-          filter: "blur(20px)"
+          background: "rgba(59, 130, 246, 0.18)",
+          filter: "blur(22px)"
         }}
       />
 
       <div
         style={{
           position: "absolute",
-          right: Math.round(size * 0.1),
-          bottom: Math.round(size * 0.1),
-          width: Math.round(size * 0.34),
-          height: Math.round(size * 0.34),
+          right: Math.round(size * 0.12),
+          bottom: Math.round(size * 0.12),
+          width: Math.round(size * 0.28),
+          height: Math.round(size * 0.28),
           borderRadius: "999px",
-          background: "rgba(16, 185, 129, 0.18)",
+          background: "rgba(14, 165, 233, 0.14)",
           filter: "blur(24px)"
         }}
       />
@@ -64,78 +64,61 @@ function IconMarkup({ size, maskable = false }) {
       <div
         style={{
           display: "flex",
-          width: cardWidth,
-          height: cardHeight,
-          borderRadius: Math.round(size * 0.2),
-          background: "linear-gradient(180deg, #fffaf0 0%, #f4ecdf 100%)",
-          border: `${Math.max(2, Math.round(size * 0.01))}px solid rgba(255, 255, 255, 0.56)`,
+          width: frameSize,
+          height: frameSize,
+          borderRadius: frameRadius,
+          background: "linear-gradient(180deg, #f8fbff 0%, #e2e8f0 100%)",
+          border: `${Math.max(2, Math.round(size * 0.01))}px solid rgba(255, 255, 255, 0.72)`,
           boxShadow:
-            "0 24px 60px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255,255,255,0.7)",
-          position: "relative"
+            "0 24px 60px rgba(15, 23, 42, 0.34), inset 0 1px 0 rgba(255,255,255,0.9)",
+          position: "relative",
+          alignItems: "center",
+          justifyContent: "center"
         }}
       >
         <div
           style={{
             position: "absolute",
-            top: Math.round(size * 0.08),
-            left: Math.round(size * 0.1),
-            width: Math.round(size * 0.18),
-            height: Math.round(size * 0.055),
+            top: Math.round(frameSize * 0.12),
+            left: Math.round(frameSize * 0.14),
+            width: lineWidth,
+            height: lineHeight,
             borderRadius: "999px",
-            background: "#1f2937"
+            background: "#cbd5e1"
           }}
         />
 
         <div
           style={{
             position: "absolute",
-            inset: `${paperInsetTop}px ${paperInsetX}px`,
+            top: Math.round(frameSize * 0.12),
+            right: Math.round(frameSize * 0.14),
             display: "flex",
             flexDirection: "column",
-            justifyContent: "flex-start"
+            gap: Math.round(frameSize * 0.035)
           }}
         >
           {[0, 1, 2].map((item) => (
             <div
               key={item}
               style={{
-                display: "flex",
-                alignItems: "center",
-                marginTop: item === 0 ? 0 : rowGap
+                width: lineWidth,
+                height: lineHeight,
+                borderRadius: "999px",
+                background: item === 0 ? "#94a3b8" : "#dbe4ee"
               }}
-            >
-              <div
-                style={{
-                  width: dotSize,
-                  height: dotSize,
-                  borderRadius: "999px",
-                  background: item === 0 ? "#10b981" : "#cbd5e1",
-                  marginRight: Math.round(cardWidth * 0.08)
-                }}
-              />
-              <div
-                style={{
-                  width: lineWidth,
-                  height: lineHeight,
-                  borderRadius: "999px",
-                  background: item === 0 ? "#334155" : "#94a3b8"
-                }}
-              />
-            </div>
+            />
           ))}
         </div>
 
         <div
           style={{
-            position: "absolute",
-            right: Math.round(cardWidth * 0.1),
-            bottom: Math.round(cardHeight * 0.1),
-            width: Math.round(cardWidth * 0.34),
-            height: Math.round(cardWidth * 0.34),
-            borderRadius: "999px",
-            background: "linear-gradient(180deg, #34d399 0%, #059669 100%)",
-            boxShadow: "0 14px 30px rgba(5, 150, 105, 0.26)",
             display: "flex",
+            width: symbolSize,
+            height: symbolSize,
+            borderRadius: symbolRadius,
+            background: "linear-gradient(180deg, #2563eb 0%, #1d4ed8 100%)",
+            boxShadow: "0 18px 32px rgba(37, 99, 235, 0.28)",
             alignItems: "center",
             justifyContent: "center"
           }}
@@ -144,8 +127,8 @@ function IconMarkup({ size, maskable = false }) {
             style={{
               display: "flex",
               position: "relative",
-              width: Math.round(cardWidth * 0.16),
-              height: Math.round(cardWidth * 0.12),
+              width: checkWidth,
+              height: checkHeight,
               transform: "rotate(-45deg) translateY(-2%)"
             }}
           >
@@ -154,10 +137,10 @@ function IconMarkup({ size, maskable = false }) {
                 position: "absolute",
                 left: 0,
                 bottom: 0,
-                width: Math.max(8, Math.round(cardWidth * 0.04)),
-                height: Math.round(cardWidth * 0.08),
+                width: Math.max(8, Math.round(symbolSize * 0.12)),
+                height: Math.round(symbolSize * 0.26),
                 borderRadius: "999px",
-                background: "#f8fafc"
+                background: "#ffffff"
               }}
             />
             <div
@@ -165,10 +148,10 @@ function IconMarkup({ size, maskable = false }) {
                 position: "absolute",
                 right: 0,
                 bottom: 0,
-                width: Math.round(cardWidth * 0.16),
-                height: Math.max(8, Math.round(cardWidth * 0.04)),
+                width: Math.round(symbolSize * 0.34),
+                height: Math.max(8, Math.round(symbolSize * 0.12)),
                 borderRadius: "999px",
-                background: "#f8fafc"
+                background: "#ffffff"
               }}
             />
           </div>
