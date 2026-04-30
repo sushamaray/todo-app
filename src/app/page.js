@@ -368,7 +368,7 @@ export default function Home() {
                           }`}
                         >
                           <span>{option}</span>
-                          {themePreference === option && <span className="text-xs">Active</span>}
+                          {themePreference === option && <span className="text-xs lowercase">[active]</span>}
                         </button>
                       ))}
                     </div>
@@ -388,7 +388,7 @@ export default function Home() {
 
           <div className="theme-card mt-6 rounded-[1.6rem] border p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="theme-copy-muted text-xs uppercase tracking-[0.24em] font-lexend">
                   Status
                 </p>

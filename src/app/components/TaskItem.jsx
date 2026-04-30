@@ -121,7 +121,7 @@ export default function TaskItem({
                 </p>
 
                 {isOverdue() && (
-                  <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-rose-700 font-lexend dark:bg-rose-950/50 dark:text-rose-300">
+                  <span className="rounded-full border border-red-300 bg-red-500 px-2.5 py-1 text-[11px] uppercase tracking-[0.18em] text-white font-lexend shadow-[0_10px_24px_rgba(239,68,68,0.24)] dark:border-red-700 dark:bg-red-700 dark:text-red-50">
                     Overdue
                   </span>
                 )}
@@ -132,10 +132,10 @@ export default function TaskItem({
                   <span
                     className={`rounded-full px-3 py-1 text-xs tabular-nums font-lexend font-semibold ${
                       isOverdue()
-                        ? "bg-rose-100 text-rose-700 dark:bg-rose-950/50 dark:text-rose-300"
+                        ? "border border-red-300 bg-red-500 text-white shadow-[0_12px_28px_rgba(239,68,68,0.28)] dark:border-red-700 dark:bg-red-700 dark:text-red-50"
                         : task.completed
                           ? "bg-stone-200 text-stone-700 dark:bg-slate-800 dark:text-slate-400"
-                          : "border border-rose-300 bg-rose-500 text-white shadow-[0_12px_28px_rgba(244,63,94,0.28)] dark:border-rose-700 dark:bg-rose-700 dark:text-rose-50"
+                          : "border border-red-300 bg-red-500 text-white shadow-[0_12px_28px_rgba(239,68,68,0.28)] dark:border-red-700 dark:bg-red-700 dark:text-red-50"
                     }`}
                   >
                     Due {formatDisplayDate(task.dueDate)}

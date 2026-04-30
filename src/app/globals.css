@@ -239,12 +239,14 @@ input {
 }
 
 .theme-stat-badge {
-  min-width: 5.5rem;
+  min-width: 6.9rem;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
   text-align: left;
+  overflow: hidden;
 }
 
 .theme-empty {
